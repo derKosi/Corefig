@@ -1,6 +1,6 @@
-# Corefig for Windows Server 2012 Core and Hyper-V Server 2012
+﻿# Corefig for Windows Server Core and Hyper-V Server
 
-Building on the foundation provided by the CoreConfig team on Core Configurator 2.0 ([http://coreconfig.codeplex.com](http://coreconfig.codeplex.com)), Corefig is a PowerShell-based GUI tool to configure the 2012 releases of Server Core and Hyper-V Server.
+Building on the foundation provided by the CoreConfig team on Core Configurator 2.0 ([http://coreconfig.codeplex.com](http://coreconfig.codeplex.com)), Corefig is a PowerShell-based GUI tool to configure Server Core and Hyper-V Server across current Windows Server releases.
 
 The application structure remains largely intact from the CoreConfig product but introduces several enhancements and leverages several of the new cmdlets.
 
@@ -9,7 +9,7 @@ Changing window styles to resizable in order to accommodate screen sizing varian
 WORK STILL IN PROGRESS
 
 ## Current Version
-1.1.3
+1.2.0
 
 **Features carried forward:**
 * Server renaming and domain joining

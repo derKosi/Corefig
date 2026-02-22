@@ -1,3 +1,10 @@
+﻿1.2
+
+Enhancements:
+* Updated UI branding and menu titles from Corefig 1.1 to Corefig 1.2.
+* Updated app descriptions to reflect support beyond Windows Server 2012.
+* Main menu now shows the current operating system caption, version, and build number.
+
 1.1
 
 Fixes:

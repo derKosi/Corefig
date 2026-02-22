@@ -1,6 +1,6 @@
 ﻿# culture=“en-US”
 ConvertFrom-StringData @'
-	PageTitle = Corefig 1.1 Networking Menu
+	PageTitle = Corefig 1.2 Networking Menu
 	PageDescription = Networking, Shares, Proxy, and iSCSI Configuration
 	Tools = Tools
 	CommandPrompt = Command Prompt

@@ -1,6 +1,6 @@
 ﻿# culture=“en-US”
 ConvertFrom-StringData @'
-	AppName = Corefig 1.1
+	AppName = Corefig 1.2
 	Tools = Tools
 	CommandPrompt = Command Prompt
 	TaskManager = Task Manager
@@ -11,10 +11,10 @@ ConvertFrom-StringData @'
 	ClearLogFile = Clear Log File
 	ComputerName = Computer Name
 	WorkgroupOrDomain = Workgroup/Domain
-	SKUVersion = Operating System
+	SKUVersion = Operating System Version
 	Help = Help
 	About = About
-	AppDescription = Tool for configuring Windows Server 2012 Core or Hyper-V
+	AppDescription = Tool for configuring Windows Server Core or Hyper-V
 	LoadAtStartup = Load at windows startup
 	LogOffDotted = Log off...
 	RestartDotted = Restart...

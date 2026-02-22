@@ -1,7 +1,7 @@
 ﻿# culture=“en-US”
 ConvertFrom-StringData @'
-	AppName = Corefig 1.1
-	AppDescription = Tool for configuring Windows Server 2012 Core or Hyper-V
+	AppName = Corefig 1.2
+	AppDescription = Tool for configuring Windows Server Core or Hyper-V
 	Credits = Credits
 	Confirmation = Confirmation
 	Close = Close
