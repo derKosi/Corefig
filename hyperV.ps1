@@ -315,6 +315,134 @@ $frmHyperV.Controls.Add($btnCancel)
 
 #region Functions
 
+function Get-HyperVProviderContext
+{
+	if ($script:HyperVProviderContext -ne $null)
+	{
+		return $script:HyperVProviderContext
+	}
+
+	$context = New-Object PSObject -Property @{ ProviderType = "Wmi"; Namespace = "root\virtualization"; SupportsVMSwitchCmdlets = $false }
+
+	if ((Get-Command -Name Get-VM -ErrorAction SilentlyContinue) -and (Get-Command -Name Start-VM -ErrorAction SilentlyContinue) -and (Get-Command -Name Stop-VM -ErrorAction SilentlyContinue))
+	{
+		$context.ProviderType = "Cmdlet"
+		$context.Namespace = ""
+		if (Get-Command -Name Get-VMSwitch -ErrorAction SilentlyContinue)
+		{
+			$context.SupportsVMSwitchCmdlets = $true
+		}
+	}
+	else
+	{
+		$namespaceCandidates = @("root\virtualization\v2", "root\virtualization")
+		foreach ($candidate in $namespaceCandidates)
+		{
+			try
+			{
+				Get-WmiObject -Class Msvm_ComputerSystem -Namespace $candidate -ErrorAction Stop | Out-Null
+				$context.Namespace = $candidate
+				break
+			}
+			catch
+			{
+				# Fall back to next namespace candidate
+			}
+		}
+	}
+
+	$script:HyperVProviderContext = $context
+	$TextStrings.LogCommandExecuted -f (Get-Date -F G), ("Hyper-V provider: " + $context.ProviderType + " " + $context.Namespace + " SwitchCmdlets=" + $context.SupportsVMSwitchCmdlets) | Out-File -FilePath $Logfile -Append
+	return $context
+}
+
+function Get-CorefigVMInventory
+{
+	$context = Get-HyperVProviderContext
+	$result = New-Object PSObject -Property @{ Running = @(); Saved = @(); Stopped = @() }
+
+	if ($context.ProviderType -eq "Cmdlet")
+	{
+		$vms = Get-VM
+		foreach ($vm in $vms)
+		{
+			switch -Regex ($vm.State.ToString())
+			{
+				"Running" { $result.Running += $vm.Name; break }
+				"Saved" { $result.Saved += $vm.Name; break }
+				"Off" { $result.Stopped += $vm.Name; break }
+				default { }
+			}
+		}
+	}
+	else
+	{
+		$systems = Get-WmiObject -Class Msvm_ComputerSystem -Namespace $context.Namespace | Where-Object { $_.Caption -ne "Hosting Computer System" }
+		foreach ($system in $systems)
+		{
+			switch ($system.EnabledState)
+			{
+				2 { $result.Running += $system.ElementName; break }
+				32769 { $result.Saved += $system.ElementName; break }
+				3 { $result.Stopped += $system.ElementName; break }
+				default { }
+			}
+		}
+	}
+
+	return $result
+}
+
+function Get-CorefigVMNetworks
+{
+	$context = Get-HyperVProviderContext
+
+	if (($context.ProviderType -eq "Cmdlet") -and $context.SupportsVMSwitchCmdlets)
+	{
+		return (Get-VMSwitch | Select-Object -ExpandProperty Name)
+	}
+
+	return (Get-WmiObject -Class Msvm_InternalEthernetPort -Namespace $context.Namespace | Where-Object { $_.EnabledState -eq "5" } | Select-Object -ExpandProperty ElementName)
+}
+
+function Start-CorefigVM($vmName)
+{
+	if ([string]::IsNullOrEmpty($vmName)) { return }
+
+	$context = Get-HyperVProviderContext
+	if ($context.ProviderType -eq "Cmdlet")
+	{
+		Start-VM -Name $vmName | Out-Null
+		return
+	}
+
+	$escapedName = $vmName.Replace("'", "''")
+	$vm = Get-WmiObject -Namespace $context.Namespace -Query "Select * From Msvm_ComputerSystem Where ElementName='$escapedName'"
+	if ($vm -ne $null)
+	{
+		$vm.RequestStateChange(2) | Out-Null
+	}
+}
+
+function Stop-CorefigVM($vmName)
+{
+	if ([string]::IsNullOrEmpty($vmName)) { return }
+
+	$context = Get-HyperVProviderContext
+	if ($context.ProviderType -eq "Cmdlet")
+	{
+		Stop-VM -Name $vmName -TurnOff -Confirm:$false | Out-Null
+		return
+	}
+
+	$escapedName = $vmName.Replace("'", "''")
+	$vm = Get-WmiObject -Namespace $context.Namespace -Query "Select * From Msvm_ComputerSystem Where ElementName='$escapedName'"
+	if ($vm -ne $null)
+	{
+		$vm.RequestStateChange(3) | Out-Null
+	}
+}
+
 function Main
 {
 	[System.Windows.Forms.Application]::EnableVisualStyles()
@@ -325,32 +453,25 @@ function Main
 function startHyperV
 {
 	$ErrorActionPreference = "SilentlyContinue"
-	
-	$GatherActiveVM = Get-WmiObject -Class Msvm_ComputerSystem -Namespace "root\virtualization" | where-object { $_.EnabledState -eq "2" } | where-object { $_.caption -ne "Hosting Computer System" }
-			
-	$GatherSavedVM = Get-WmiObject -Class Msvm_ComputerSystem -Namespace "root\virtualization" | where-object { $_.EnabledState -eq "32769" }
-	
-	$GatherStoppedVM = Get-WmiObject -Class Msvm_ComputerSystem -Namespace "root\virtualization" | where-object { $_.EnabledState -eq "3" }
-		
-	$GatherNetwork = Get-WmiObject -Class Msvm_InternalEthernetPort -Namespace "root\virtualization" | where-object { $_.EnabledState -eq "5" }
-		
-	foreach ($Active in $GatherActiveVM)
+	$inventory = Get-CorefigVMInventory
+	$networks = Get-CorefigVMNetworks
+
+	foreach ($active in $inventory.Running)
 	{
-		$ListboxActive.Items.Add($Active.Elementname) + $ListboxStatus.Items.Add("Running")
+		$ListboxActive.Items.Add($active) + $ListboxStatus.Items.Add("Running")
 	}
-	foreach ($Saved in $GatherSavedVM)
+	foreach ($saved in $inventory.Saved)
 	{
-		$ListboxActive.Items.Add($Saved.Elementname) + $ListboxStatus.Items.Add("Saved")
+		$ListboxActive.Items.Add($saved) + $ListboxStatus.Items.Add("Saved")
 	}
-	foreach ($Stopped in $GatherStoppedVM)
+	foreach ($stopped in $inventory.Stopped)
 	{
-		$ListboxStopped.Items.Add($Stopped.Elementname) + $ListboxStoppedStatus.Items.Add("Stopped")
+		$ListboxStopped.Items.Add($stopped) + $ListboxStoppedStatus.Items.Add("Stopped")
 	}
-	foreach ($Network in $GatherNetwork)
+	foreach ($network in $networks)
 	{
-		$ListboxNetwork.Items.Add($Network.Elementname)
+		$ListboxNetwork.Items.Add($network)
 	}
-	
 }
 
 function BtnCancelClick($object)
@@ -361,37 +482,26 @@ function BtnCancelClick($object)
 
 function StartVM($object)
 {
-	$StartVM = Get-WmiObject -Namespace "root\virtualization" -Query "Select * From Msvm_ComputerSystem Where ElementName='$object'"
-	
-	$StartVM.requeststatechange(2)
-		
+	Start-CorefigVM $object
+
 	$frmHyperV.Cursor = [System.Windows.Forms.Cursors]::WaitCursor
-	
-	Start-Sleep -s 5	
-	
+	Start-Sleep -s 3
 	RefreshVM
-		
 	$frmHyperV.Cursor = [System.Windows.Forms.Cursors]::Default
-		
+
 	#Output to Logfile
 	$TextStrings.LogVirtualMachineStarted -f (Get-Date -F G), $object | Out-File -FilePath $Logfile -append
-	
 }
 
 function StopVM($object)
 {
-	$StopVM = Get-WmiObject -Namespace "root\virtualization" -Query "Select * From Msvm_ComputerSystem Where ElementName='$object'"
-		
-	$StopVM.requeststatechange(3)
-		
+	Stop-CorefigVM $object
+
 	$frmHyperV.Cursor = [System.Windows.Forms.Cursors]::WaitCursor
-	
-	Start-Sleep -s 5	
-	
+	Start-Sleep -s 3
 	RefreshVM
-		
 	$frmHyperV.Cursor = [System.Windows.Forms.Cursors]::Default
-		
+
 	#Output to Logfile
 	$TextStrings.LogVirtualMachineStopped -f (Get-Date -F G), $object | Out-File -FilePath $Logfile -append
 }
@@ -409,35 +519,29 @@ function RefreshVM
 
 function Screenshot($object)
 {
-		
-	$HyperVParent = "localhost" 
-	$HyperVGuest = $ListboxActive.selecteditem 
-	$xRes = 640 
+	$context = Get-HyperVProviderContext
+	$namespace = $context.Namespace
+	if ([string]::IsNullOrEmpty($namespace))
+	{
+		$namespace = "root\virtualization\v2"
+	}
+
+	$HyperVParent = "localhost"
+	$HyperVGuest = $ListboxActive.selecteditem
+	$xRes = 640
 	$yRes = 480
-	
-	
-	$VMManagementService = Get-WmiObject -class "Msvm_VirtualSystemManagementService" -namespace "root\virtualization" -ComputerName $HyperVParent
-		
-	$Vm = Get-WmiObject -Namespace "root\virtualization" -ComputerName $HyperVParent -Query "Select * From Msvm_ComputerSystem Where ElementName='$HyperVGuest'"
-		
-	$VMSettingData = Get-WmiObject -Namespace "root\virtualization" -Query "Associators of {$Vm} Where ResultClass=Msvm_VirtualSystemSettingData AssocClass=Msvm_SettingsDefineState" -ComputerName $HyperVParent
-		
-	$RawImageData = $VMManagementService.GetVirtualSystemThumbnailImage($VMSettingData, "$xRes", "$yRes") 
-		
-	#| ProcessWMIJob $VMManagementService.PSBase.ClassPath "GetVirtualSystemThumbnailImage" 
-	
-	$VMThumbnail = New-Object System.Drawing.Bitmap($xRes, $yRes, [System.Drawing.Imaging.PixelFormat]::Format16bppRgb565) 
-		
-	$rectangle = New-Object System.Drawing.Rectangle(0, 0, $xRes, $yRes) 
-		
+
+	$VMManagementService = Get-WmiObject -class "Msvm_VirtualSystemManagementService" -namespace $namespace -ComputerName $HyperVParent
+	$escapedGuest = $HyperVGuest.Replace("'", "''")
+	$Vm = Get-WmiObject -Namespace $namespace -ComputerName $HyperVParent -Query "Select * From Msvm_ComputerSystem Where ElementName='$escapedGuest'"
+	$VMSettingData = Get-WmiObject -Namespace $namespace -Query "Associators of {$Vm} Where ResultClass=Msvm_VirtualSystemSettingData AssocClass=Msvm_SettingsDefineState" -ComputerName $HyperVParent
+	$RawImageData = $VMManagementService.GetVirtualSystemThumbnailImage($VMSettingData, "$xRes", "$yRes")
+
+	$VMThumbnail = New-Object System.Drawing.Bitmap($xRes, $yRes, [System.Drawing.Imaging.PixelFormat]::Format16bppRgb565)
+	$rectangle = New-Object System.Drawing.Rectangle(0, 0, $xRes, $yRes)
 	[System.Drawing.Imaging.BitmapData] $VMThumbnailBitmapData = $VMThumbnail.LockBits($rectangle, [System.Drawing.Imaging.ImageLockMode]::WriteOnly, [System.Drawing.Imaging.PixelFormat]::Format16bppRgb565)
-		
 	[System.Runtime.InteropServices.marshal]::Copy($RawImageData.ImageData, 0, $VMThumbnailBitmapData.Scan0, $xRes*$yRes*2)
-		
-	$VMThumbnail.UnlockBits($VMThumbnailBitmapData);
-		
-	$VMThumbnail
-		
+	$VMThumbnail.UnlockBits($VMThumbnailBitmapData)
 	$PictureBoxSS.Image = $VMThumbnail
 }
 
