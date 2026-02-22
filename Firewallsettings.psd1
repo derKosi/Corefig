@@ -1,6 +1,6 @@
 ﻿# culture=“en-US”
 ConvertFrom-StringData @'
-	AppName = Corefig 1.1
+	AppName = Corefig 1.2
 	PageTitle = Firewall Settings Menu
 	Close = Close
 	RuleConfiguration = Rule Configuration

@@ -1006,7 +1006,7 @@ function Get-Status
 	$lblDomainValue.Text = $Temp.Domain
 
 	$OS = gwmi Win32_OperatingSystem
-	$lblVersionValue.Text = $OS.Caption
+	$lblVersionValue.Text = "{0} ({1}, Build {2})" -f $OS.Caption, $OS.Version, $OS.BuildNumber
 
 	# If the script was called by Start_Corefig.wsf, it will have already detected Hyper-V and MPIO
 	if (($HyperVEnabled.Length -eq 0) -or ($MPIOEnabled.Length -eq 0))

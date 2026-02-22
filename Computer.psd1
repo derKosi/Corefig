@@ -1,6 +1,6 @@
 ﻿# culture=“en-US”
 ConvertFrom-StringData @'
-	AppName = Corefig 1.1
+	AppName = Corefig 1.2
 	ComputerName = Computer Name
 	WorkgroupOrDomain = Workgroup/Domain
 	SKUVersion = Operating System

@@ -1,6 +1,6 @@
 ﻿# culture=“en-US”
 ConvertFrom-StringData @'
-	AppName = Corefig 1.1
+	AppName = Corefig 1.2
 	Tools = Tools
 	CommandPrompt = Command Prompt
 	TaskManager = Task Manager
@@ -14,7 +14,7 @@ ConvertFrom-StringData @'
 	SKUVersion = Operating System
 	Help = Help
 	About = About
-	CPMenuDescription = Control Panel for Windows Server 2012 Hyper-V and Core
+	CPMenuDescription = Control Panel for Windows Server Hyper-V and Core
 	CPMenuTitle = Control Panel Menu
 	RegionalDescription = Keyboard, time, and date settings
 	DTButton = Date and Time...
