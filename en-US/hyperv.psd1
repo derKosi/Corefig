@@ -9,6 +9,8 @@ ConvertFrom-StringData @'
 	VSwitches = Virtual Switches
 	RefreshThumbs = Refresh Thumbnails
 	RefreshVMs = Refresh Virtual Machines
+	RemoteHealth = Hyper-V Remote Health
+	RemoteHealthReport = WinRM Listener: {0}\nWinRM Firewall Rules: {1}\nPowerShell Remoting: {2}
 	Thumbnail = Thumbnail
 	Actions = Actions
 	LogVirtualMachineStarted = {0} Virtual Machine "{1}" Started

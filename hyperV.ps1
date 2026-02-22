@@ -154,6 +154,16 @@ $btnRefreshVM.TabIndex = 0
 $btnRefreshVM.Text = $TextStrings.RefreshVMs
 $btnRefreshVM.UseVisualStyleBackColor = $true
 $btnRefreshVM.add_Click({RefreshVM($btnRefreshVM)})
+#~~< btnRemoteHealth >~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+$btnRemoteHealth = New-Object System.Windows.Forms.Button
+$btnRemoteHealth.FlatStyle = [System.Windows.Forms.FlatStyle]::System
+$btnRemoteHealth.Font = New-Object System.Drawing.Font("Tahoma", 8.25, [System.Drawing.FontStyle]::Regular, [System.Drawing.GraphicsUnit]::Point, ([System.Byte](0)))
+$btnRemoteHealth.Location = New-Object System.Drawing.Point(15, 277)
+$btnRemoteHealth.Size = New-Object System.Drawing.Size(161, 26)
+$btnRemoteHealth.TabIndex = 0
+$btnRemoteHealth.Text = $TextStrings.RemoteHealth
+$btnRemoteHealth.UseVisualStyleBackColor = $true
+$btnRemoteHealth.add_Click({Show-HyperVRemoteHealth})
 #~~< Label1 >~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 $Label1 = New-Object System.Windows.Forms.Label
 $Label1.Font = New-Object System.Drawing.Font("Tahoma", 8.25, [System.Drawing.FontStyle]::Bold, [System.Drawing.GraphicsUnit]::Point, ([System.Byte](0)))
@@ -174,6 +184,7 @@ $SplitContainer1.Panel2.Controls.Add($Label2)
 $SplitContainer1.Panel2.Controls.Add($PictureBoxSS)
 $SplitContainer1.Panel2.Controls.Add($btnRefreshPic)
 $SplitContainer1.Panel2.Controls.Add($btnRefreshVM)
+$SplitContainer1.Panel2.Controls.Add($btnRemoteHealth)
 $SplitContainer1.Panel2.Controls.Add($Label1)
 $SplitContainer1.Panel2.Controls.Add($lblActions)
 $SplitContainer1.Panel2.add_Paint({Panel2Paint($SplitContainer1.Panel2)})
@@ -359,35 +370,35 @@ function Get-HyperVProviderContext
 function Get-CorefigVMInventory
 {
 	$context = Get-HyperVProviderContext
-	$result = New-Object PSObject -Property @{ Running = @(); Saved = @(); Stopped = @() }
+	$result = New-Object PSObject -Property @{ Running = @(); Saved = @(); Stopped = @(); Unknown = @() }
 
 	if ($context.ProviderType -eq "Cmdlet")
 	{
 		$vms = Get-VM
 		foreach ($vm in $vms)
 		{
-			switch -Regex ($vm.State.ToString())
-			{
-				"Running" { $result.Running += $vm.Name; break }
-				"Saved" { $result.Saved += $vm.Name; break }
-				"Off" { $result.Stopped += $vm.Name; break }
-				default { }
+				switch -Regex ($vm.State.ToString())
+				{
+					"Running" { $result.Running += $vm.Name; break }
+					"Saved" { $result.Saved += $vm.Name; break }
+					"Off" { $result.Stopped += $vm.Name; break }
+					default { $result.Unknown += $vm.Name }
+				}
 			}
-		}
 	}
 	else
 	{
 		$systems = Get-WmiObject -Class Msvm_ComputerSystem -Namespace $context.Namespace | Where-Object { $_.Caption -ne "Hosting Computer System" }
 		foreach ($system in $systems)
 		{
-			switch ($system.EnabledState)
-			{
-				2 { $result.Running += $system.ElementName; break }
-				32769 { $result.Saved += $system.ElementName; break }
-				3 { $result.Stopped += $system.ElementName; break }
-				default { }
+				switch ($system.EnabledState)
+				{
+					2 { $result.Running += $system.ElementName; break }
+					32769 { $result.Saved += $system.ElementName; break }
+					3 { $result.Stopped += $system.ElementName; break }
+					default { $result.Unknown += $system.ElementName }
+				}
 			}
-		}
 	}
 
 	return $result
@@ -403,6 +414,90 @@ function Get-CorefigVMNetworks
 	}
 
 	return (Get-WmiObject -Class Msvm_InternalEthernetPort -Namespace $context.Namespace | Where-Object { $_.EnabledState -eq "5" } | Select-Object -ExpandProperty ElementName)
+}
+
+function Get-CorefigVMThumbnail($vmName, $xRes, $yRes)
+{
+	if ([string]::IsNullOrEmpty($vmName)) { return $null }
+
+	$context = Get-HyperVProviderContext
+	$namespace = $context.Namespace
+	if ([string]::IsNullOrEmpty($namespace))
+	{
+		$namespace = "root\virtualization\v2"
+	}
+
+	$HyperVParent = "localhost"
+	$VMManagementService = Get-WmiObject -class "Msvm_VirtualSystemManagementService" -namespace $namespace -ComputerName $HyperVParent
+	$escapedGuest = $vmName.Replace("'", "''")
+	$Vm = Get-WmiObject -Namespace $namespace -ComputerName $HyperVParent -Query "Select * From Msvm_ComputerSystem Where ElementName='$escapedGuest'"
+	if ($Vm -eq $null) { return $null }
+
+	$VMSettingData = Get-WmiObject -Namespace $namespace -Query "Associators of {$Vm} Where ResultClass=Msvm_VirtualSystemSettingData AssocClass=Msvm_SettingsDefineState" -ComputerName $HyperVParent
+	$RawImageData = $VMManagementService.GetVirtualSystemThumbnailImage($VMSettingData, "$xRes", "$yRes")
+	if (($RawImageData -eq $null) -or ($RawImageData.ImageData -eq $null)) { return $null }
+
+	$VMThumbnail = New-Object System.Drawing.Bitmap($xRes, $yRes, [System.Drawing.Imaging.PixelFormat]::Format16bppRgb565)
+	$rectangle = New-Object System.Drawing.Rectangle(0, 0, $xRes, $yRes)
+	[System.Drawing.Imaging.BitmapData] $VMThumbnailBitmapData = $VMThumbnail.LockBits($rectangle, [System.Drawing.Imaging.ImageLockMode]::WriteOnly, [System.Drawing.Imaging.PixelFormat]::Format16bppRgb565)
+	[System.Runtime.InteropServices.marshal]::Copy($RawImageData.ImageData, 0, $VMThumbnailBitmapData.Scan0, $xRes*$yRes*2)
+	$VMThumbnail.UnlockBits($VMThumbnailBitmapData)
+
+	return $VMThumbnail
+}
+
+function Get-CorefigHyperVRemoteHealth
+{
+	$listenerState = "Unavailable"
+	$remotingState = "Unavailable"
+	$firewallState = "Unavailable"
+
+	$listenerOutput = & winrm enumerate winrm/config/listener 2>&1
+	if (($listenerOutput | Out-String) -match "Transport = HTTP|Transport = HTTPS")
+	{
+		$listenerState = "Configured"
+	}
+	else
+	{
+		$listenerState = "Not configured"
+	}
+
+	if (Get-Command -Name Get-NetFirewallRule -ErrorAction SilentlyContinue)
+	{
+		$enabledRules = Get-NetFirewallRule -DisplayGroup "Windows Remote Management" -ErrorAction SilentlyContinue | Where-Object { $_.Enabled -eq "True" }
+		if (($enabledRules | Measure-Object).Count -gt 0)
+		{
+			$firewallState = "Enabled"
+		}
+		else
+		{
+			$firewallState = "No enabled WinRM rules"
+		}
+	}
+
+	$remotingOutput = & powershell -NoProfile -Command "Get-PSSessionConfiguration -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name" 2>&1
+	if (($remotingOutput | Measure-Object).Count -gt 0)
+	{
+		$remotingState = "Enabled"
+	}
+	else
+	{
+		$remotingState = "Not enabled"
+	}
+
+	return New-Object PSObject -Property @{
+		WinRMListener = $listenerState
+		WinRMFirewall = $firewallState
+		PowerShellRemoting = $remotingState
+	}
+}
+
+function Show-HyperVRemoteHealth
+{
+	$health = Get-CorefigHyperVRemoteHealth
+	$message = ($TextStrings.RemoteHealthReport -f $health.WinRMListener, $health.WinRMFirewall, $health.PowerShellRemoting)
+	[System.Windows.Forms.MessageBox]::Show($message, $TextStrings.RemoteHealth, [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+	$TextStrings.LogCommandExecuted -f (Get-Date -F G), ("Hyper-V remote health: WinRMListener=" + $health.WinRMListener + "; Firewall=" + $health.WinRMFirewall + "; PSRemoting=" + $health.PowerShellRemoting) | Out-File -FilePath $Logfile -Append
 }
 
 function Start-CorefigVM($vmName)
@@ -519,30 +614,14 @@ function RefreshVM
 
 function Screenshot($object)
 {
-	$context = Get-HyperVProviderContext
-	$namespace = $context.Namespace
-	if ([string]::IsNullOrEmpty($namespace))
-	{
-		$namespace = "root\virtualization\v2"
-	}
-
-	$HyperVParent = "localhost"
 	$HyperVGuest = $ListboxActive.selecteditem
 	$xRes = 640
 	$yRes = 480
-
-	$VMManagementService = Get-WmiObject -class "Msvm_VirtualSystemManagementService" -namespace $namespace -ComputerName $HyperVParent
-	$escapedGuest = $HyperVGuest.Replace("'", "''")
-	$Vm = Get-WmiObject -Namespace $namespace -ComputerName $HyperVParent -Query "Select * From Msvm_ComputerSystem Where ElementName='$escapedGuest'"
-	$VMSettingData = Get-WmiObject -Namespace $namespace -Query "Associators of {$Vm} Where ResultClass=Msvm_VirtualSystemSettingData AssocClass=Msvm_SettingsDefineState" -ComputerName $HyperVParent
-	$RawImageData = $VMManagementService.GetVirtualSystemThumbnailImage($VMSettingData, "$xRes", "$yRes")
-
-	$VMThumbnail = New-Object System.Drawing.Bitmap($xRes, $yRes, [System.Drawing.Imaging.PixelFormat]::Format16bppRgb565)
-	$rectangle = New-Object System.Drawing.Rectangle(0, 0, $xRes, $yRes)
-	[System.Drawing.Imaging.BitmapData] $VMThumbnailBitmapData = $VMThumbnail.LockBits($rectangle, [System.Drawing.Imaging.ImageLockMode]::WriteOnly, [System.Drawing.Imaging.PixelFormat]::Format16bppRgb565)
-	[System.Runtime.InteropServices.marshal]::Copy($RawImageData.ImageData, 0, $VMThumbnailBitmapData.Scan0, $xRes*$yRes*2)
-	$VMThumbnail.UnlockBits($VMThumbnailBitmapData)
-	$PictureBoxSS.Image = $VMThumbnail
+	$VMThumbnail = Get-CorefigVMThumbnail $HyperVGuest $xRes $yRes
+	if ($VMThumbnail -ne $null)
+	{
+		$PictureBoxSS.Image = $VMThumbnail
+	}
 }
 
 function Label1Click( $object ){
