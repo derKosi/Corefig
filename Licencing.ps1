@@ -1257,9 +1257,9 @@ function InfoForm([string]$Messagetxt, [int32] $Font,[string]$Type)
   $btnClose.Text = $TextStrings.OK
   switch($Type)
   {
-    $TextStrings.Info{$pboxInfo.visible = $true}
+    $TextStrings.Info {$pboxInfo.visible = $true}
     $TextStrings.Error {$pboxError.visible = $true }
-    $TextStrings.Warning{$pboxWarning.visible = $true }
+    $TextStrings.Warning {$pboxWarning.visible = $true }
   }
   $frmMessage.ShowDialog()
 }
