@@ -8,6 +8,10 @@ The application structure remains largely intact from the CoreConfig product but
 Changing window styles to resizable in order to accommodate screen sizing variances
 WORK STILL IN PROGRESS
 
+## Supported Platforms
+
+Corefig targets headless Windows hosts: Hyper-V Server (free standalone, 2008 R2-2019) and Server Core installations with the Hyper-V role (2012-2025). The free standalone product ended with Hyper-V Server 2019 (extended support until 2029-01-09); there is no standalone successor - Microsoft's HCI path is Azure Local. See [docs/PLATFORM_SUPPORT.md](docs/PLATFORM_SUPPORT.md) for the full matrix.
+
 ## Current Version
 1.2.0
 

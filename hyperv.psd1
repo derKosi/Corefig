@@ -10,7 +10,7 @@ ConvertFrom-StringData @'
 	RefreshThumbs = Refresh Thumbnails
 	RefreshVMs = Refresh Virtual Machines
 	RemoteHealth = Hyper-V Remote Health
-	RemoteHealthReport = WinRM Listener: {0}\nWinRM Firewall Rules: {1}\nPowerShell Remoting: {2}
+	RemoteHealthReport = Operating system: {0}\nWinRM Listener: {1}\nWinRM Firewall Rules: {2}\nPowerShell Remoting: {3}
 	Thumbnail = Thumbnail
 	Actions = Actions
 	LogVirtualMachineStarted = {0} Virtual Machine "{1}" Started

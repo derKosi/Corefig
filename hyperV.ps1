@@ -448,6 +448,17 @@ function Get-CorefigVMThumbnail($vmName, $xRes, $yRes)
 
 function Get-CorefigHyperVRemoteHealth
 {
+	$osInfo = Get-WmiObject -Class Win32_OperatingSystem -ErrorAction SilentlyContinue
+	$osLine = ""
+	if ($osInfo)
+	{
+		$osLine = $osInfo.Caption + " (build " + $osInfo.BuildNumber + ")"
+		if ($osInfo.Caption -match "Hyper-V Server 2019")
+		{
+			$osLine = $osLine + " - extended support ends 2029-01-09 (last free standalone version)"
+		}
+	}
+
 	$listenerState = "Unavailable"
 	$remotingState = "Unavailable"
 	$firewallState = "Unavailable"
@@ -486,6 +497,7 @@ function Get-CorefigHyperVRemoteHealth
 	}
 
 	return New-Object PSObject -Property @{
+		OperatingSystem = $osLine
 		WinRMListener = $listenerState
 		WinRMFirewall = $firewallState
 		PowerShellRemoting = $remotingState
@@ -495,7 +507,7 @@ function Get-CorefigHyperVRemoteHealth
 function Show-HyperVRemoteHealth
 {
 	$health = Get-CorefigHyperVRemoteHealth
-	$message = ($TextStrings.RemoteHealthReport -f $health.WinRMListener, $health.WinRMFirewall, $health.PowerShellRemoting)
+	$message = ($TextStrings.RemoteHealthReport -f $health.OperatingSystem, $health.WinRMListener, $health.WinRMFirewall, $health.PowerShellRemoting)
 	[System.Windows.Forms.MessageBox]::Show($message, $TextStrings.RemoteHealth, [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
 	$TextStrings.LogCommandExecuted -f (Get-Date -F G), ("Hyper-V remote health: WinRMListener=" + $health.WinRMListener + "; Firewall=" + $health.WinRMFirewall + "; PSRemoting=" + $health.PowerShellRemoting) | Out-File -FilePath $Logfile -Append
 }
