@@ -1138,7 +1138,7 @@ function OK
 		else
 		{
 			$Cmd = "cscript //Nologo " + $sCommand + " /ipk " + $TxtBoxIPK.Text
-			$ListStatus2.text = iex $Cmd
+			$ListStatus2.text = & cscript //Nologo $sCommand /ipk $TxtBoxIPK.Text
 			#Output to Logfile
 			$TextStrings.LogCommandExecuted -f (Get-Date -F G), $Cmd | Out-File -FilePath $Logfile -append
 		}
@@ -1158,7 +1158,7 @@ function OK
 		else
 		{
 			$Cmd = "cscript //Nologo " + $sCommand + " /atp " + $TxtBoxUPCI.Text
-			$ListStatus2.text = iex $Cmd
+			$ListStatus2.text = & cscript //Nologo $sCommand /atp $TxtBoxUPCI.Text
 			#Output to Logfile
 			$TextStrings.LogCommandExecuted -f (Get-Date -F G), $Cmd | Out-File -FilePath $Logfile -append		
 		}
@@ -1215,7 +1215,7 @@ function OK
 		else
 		{
 			$Cmd = "cscript //Nologo " + $sCommand + " /skms " + $TxtBoxSKMS.Text
-			$ListStatus3.text = iex $Cmd
+			$ListStatus3.text = & cscript //Nologo $sCommand /skms $TxtBoxSKMS.Text
 			#Output to Logfile
 			$TextStrings.LogCommandExecuted -f (Get-Date -F G), $Cmd | Out-File -FilePath $Logfile -append			
 		}

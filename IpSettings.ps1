@@ -1044,7 +1044,7 @@ function OK
 		}
 		# DNS Settings
 		$DNSServerArray = (Get-DnsClientServerAddress -InterfaceAlias $Adapter.Name -AddressFamily IPv4).ServerAddresses
-		$CommandOutput = Invoke-Expression ("netsh interface ipv4 show dnsservers name = ""{0}""" -f $Adapter.Name)
+		$CommandOutput = & netsh interface ipv4 show dnsservers name = $Adapter.Name
 		$DNSfromDHCP = $true
 		if (($CommandOutput -cmatch "\bStatically\b").Count -gt 0)
 		{
@@ -1281,8 +1281,7 @@ function GetDNS([String]$InAdapter)
 		$ListDNS.Items.Add($DNSServer)
 	}
 	$TxtBoxMAC.Text = $Adapter.MACAddress
-	$CommandLine = "netsh interface ipv4 show dnsservers name= " + [char]34 + $Adapter.Name + [char]34
-	$CommandOutput = Invoke-Expression $CommandLine
+	$CommandOutput = & netsh interface ipv4 show dnsservers name= $Adapter.Name
 	if (($CommandOutput -cmatch "\bStatically\b").Count -gt 0)
 	{
 		$Button1.Enabled = $True
@@ -1360,8 +1359,7 @@ function GetIp([string]$InAdapter)
 	$TxtBoxPreferredDNS.Text = $DNSServers[0]
 	$TxtBoxAlernateDNS.Text = $DNSServers[1]
 	# the next lines check to see if DNS servers are delivered by DHCP or statically set; it would be nice if there were a better way
-	$CommandLine = "netsh interface ipv4 show dnsservers name= " + [char]34 + $Adapter.Name + [char]34
-	$CommandOutput = Invoke-Expression $CommandLine
+	$CommandOutput = & netsh interface ipv4 show dnsservers name= $Adapter.Name
 	if (($CommandOutput -cmatch "\bStatically\b").Count -gt 0)
 	{
 		$DNSStaticRadioButton.Checked = $True
