@@ -393,12 +393,13 @@ function OK{
 		$server = $a + ":" + $b
 		$override = $ListBoxExceptions.Text
 		$Proxy = "netsh winhttp set proxy " + $server + " bypass-list=" + [char]34 + $override + [char]34
+		& netsh winhttp set proxy $server ("bypass-list=" + $override)
 	}
 	else
 	{
-		$Proxy = "netsh winhttp reset proxy"		
+		$Proxy = "netsh winhttp reset proxy"
+		& netsh winhttp reset proxy		
 	}
-	Invoke-Expression $Proxy
 	$ButtonOK.enabled = $True
 		
 	#Output to Logfile
